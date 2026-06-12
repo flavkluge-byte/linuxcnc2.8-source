@@ -90,7 +90,7 @@
    against the code in the shared memory area.  If they don't match,
    the rtapi_init() call will faill.
 */
-static unsigned int rev_code = 1;  // increment this whenever you change the data structures
+static unsigned int rev_code = 2;  // increment this whenever you change the data structures
 
 /* These structs hold data associated with objects like tasks, etc. */
 
