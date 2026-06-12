@@ -565,6 +565,10 @@ void emcmotCommandHandler_locked(void *arg, long servo_period)
 		SET_JOINT_FAULT_FLAG(joint, 0);
 	    }
 	    emcmotStatus->paused = 0;
+	    if (emcmotStatus->paused_for_jog) {
+		emcmotStatus->paused_for_jog = 0;
+		emcmotDebug->coordinating = 1;
+	    }
 	    break;
 
 	case EMCMOT_JOINT_ABORT:
@@ -817,6 +821,11 @@ void emcmotCommandHandler_locked(void *arg, long servo_period)
 		SET_JOINT_ERROR_FLAG(joint, 1);
 		break;
 	    }
+	    /* if paused in COORD mode, switch to FREE so the jog executes */
+	    if (emcmotStatus->paused && GET_MOTION_COORD_FLAG()) {
+		emcmotDebug->coordinating = 0;
+		emcmotStatus->paused_for_jog = 1;
+	    }
             if (!GET_MOTION_TELEOP_FLAG()) {
 	        if (joint->wheel_jjog_active) {
 		    /* can't do two kinds of jog at once */
@@ -854,10 +863,13 @@ void emcmotCommandHandler_locked(void *arg, long servo_period)
 	        /*! \todo FIXME - should we really be clearing errors here? */
 	        SET_JOINT_ERROR_FLAG(joint, 0);
 	        /* clear joints homed flag(s) if we don't have forward kins.
+	           Skip when jogging during pause so COORD mode can be restored.
 	           Otherwise, a transition into coordinated mode will incorrectly
 	           assume the homed position. Do all if they've all been moved
 	           since homing, otherwise just do this one */
-	        clearHomes(joint_num);
+	        if (!emcmotStatus->paused_for_jog) {
+	            clearHomes(joint_num);
+	        }
             } else {
                 // TELEOP  JOG_CONT
                 double ext_offset_epsilon = TINY_DP(axis->ext_offset_tp.max_acc,servo_period);
@@ -907,6 +919,11 @@ void emcmotCommandHandler_locked(void *arg, long servo_period)
 		SET_JOINT_ERROR_FLAG(joint, 1);
 		break;
 	    }
+	    /* if paused in COORD mode, switch to FREE so the jog executes */
+	    if (emcmotStatus->paused && GET_MOTION_COORD_FLAG()) {
+		emcmotDebug->coordinating = 0;
+		emcmotStatus->paused_for_jog = 1;
+	    }
             if (!GET_MOTION_TELEOP_FLAG()) {
 	        if (joint->wheel_jjog_active) {
 		    /* can't do two kinds of jog at once */
@@ -952,10 +969,10 @@ void emcmotCommandHandler_locked(void *arg, long servo_period)
                 }
 	        SET_JOINT_ERROR_FLAG(joint, 0);
 	        /* clear joint homed flag(s) if we don't have forward kins.
-	           Otherwise, a transition into coordinated mode will incorrectly
-	           assume the homed position. Do all if they've all been moved
-	           since homing, otherwise just do this one */
-	        clearHomes(joint_num);
+	           Skip when jogging during pause so COORD mode can be restored. */
+	        if (!emcmotStatus->paused_for_jog) {
+	            clearHomes(joint_num);
+	        }
             } else {
                 // TELEOP JOG_INCR
                 double ext_offset_epsilon = TINY_DP(axis->ext_offset_tp.max_acc,servo_period);
@@ -1006,6 +1023,11 @@ void emcmotCommandHandler_locked(void *arg, long servo_period)
 		SET_JOINT_ERROR_FLAG(joint, 1);
 		break;
 	    }
+	    /* if paused in COORD mode, switch to FREE so the jog executes */
+	    if (emcmotStatus->paused && GET_MOTION_COORD_FLAG()) {
+		emcmotDebug->coordinating = 0;
+		emcmotStatus->paused_for_jog = 1;
+	    }
             if (!GET_MOTION_TELEOP_FLAG()) {
                 // FREE JOG_ABS
                 if (joint->wheel_jjog_active) {
@@ -1037,10 +1059,10 @@ void emcmotCommandHandler_locked(void *arg, long servo_period)
                 joint->free_tp.enable = 1;
                 SET_JOINT_ERROR_FLAG(joint, 0);
                 /* clear joint homed flag(s) if we don't have forward kins.
-                   Otherwise, a transition into coordinated mode will incorrectly
-                   assume the homed position. Do all if they've all been moved
-                   since homing, otherwise just do this one */
-                clearHomes(joint_num);
+                   Skip when jogging during pause so COORD mode can be restored. */
+                if (!emcmotStatus->paused_for_jog) {
+                    clearHomes(joint_num);
+                }
             } else {
                 axis->kb_ajog_active = 1;
                 // TELEOP JOG_ABS
@@ -1249,6 +1271,12 @@ void emcmotCommandHandler_locked(void *arg, long servo_period)
 	    /* can happen at any time */
 	    rtapi_print_msg(RTAPI_MSG_DBG, "PAUSE");
 	    tpPause(&emcmotDebug->coord_tp);
+	    if (!emcmotStatus->paused) {
+		/* first pause: snapshot position and DTG for jog-while-paused */
+		emcmotStatus->pause_cmd_pos        = emcmotStatus->carte_pos_cmd;
+		emcmotStatus->pause_dtg            = emcmotStatus->dtg;
+		emcmotStatus->pause_distance_to_go = emcmotStatus->distance_to_go;
+	    }
 	    emcmotStatus->paused = 1;
 	    break;
 
@@ -1271,6 +1299,16 @@ void emcmotCommandHandler_locked(void *arg, long servo_period)
 	    /* can happen at any time */
 	    rtapi_print_msg(RTAPI_MSG_DBG, "RESUME");
 	    emcmotDebug->stepping = 0;
+	    if (emcmotStatus->paused_for_jog) {
+		/* stop any in-progress jog */
+		for (joint_num = 0; joint_num < emcmotConfig->numJoints; joint_num++) {
+		    joints[joint_num].free_tp.enable = 0;
+		}
+		/* switch back to COORD; set_operating_mode() will call tpSetPos()
+		   with the actual stopped position when INPOS is established */
+		emcmotDebug->coordinating = 1;
+		emcmotStatus->paused_for_jog = 0;
+	    }
 	    tpResume(&emcmotDebug->coord_tp);
 	    emcmotStatus->paused = 0;
 	    break;

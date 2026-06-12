@@ -1245,6 +1245,13 @@ static int emcTaskPlan(void)
 		    retval = emcTaskIssueCommand(emcCommand);
 		    break;
 
+		case EMC_JOG_CONT_TYPE:
+		case EMC_JOG_INCR_TYPE:
+		case EMC_JOG_ABS_TYPE:
+		case EMC_JOG_STOP_TYPE:
+		    retval = emcTaskIssueCommand(emcCommand);
+		    break;
+
 		case EMC_TASK_PLAN_STEP_TYPE:
 		    stepping = 1;
 		    steppingWait = 0;

@@ -1353,6 +1353,26 @@ static void get_pos_cmds(long period)
 	    emcmotStatus->carte_pos_cmd_ok = 0;
 	    break;
 	}
+	/* while paused with a jog in progress, recompute DTG live so the
+	   GUI reflects the actual remaining distance from the current pos */
+	if (emcmotStatus->paused && emcmotStatus->paused_for_jog) {
+	    EmcPose jog_delta;
+	    emcPoseSub(&emcmotStatus->carte_pos_cmd,
+	               &emcmotStatus->pause_cmd_pos, &jog_delta);
+	    emcmotStatus->dtg.tran.x = emcmotStatus->pause_dtg.tran.x - jog_delta.tran.x;
+	    emcmotStatus->dtg.tran.y = emcmotStatus->pause_dtg.tran.y - jog_delta.tran.y;
+	    emcmotStatus->dtg.tran.z = emcmotStatus->pause_dtg.tran.z - jog_delta.tran.z;
+	    emcmotStatus->dtg.a      = emcmotStatus->pause_dtg.a      - jog_delta.a;
+	    emcmotStatus->dtg.b      = emcmotStatus->pause_dtg.b      - jog_delta.b;
+	    emcmotStatus->dtg.c      = emcmotStatus->pause_dtg.c      - jog_delta.c;
+	    emcmotStatus->dtg.u      = emcmotStatus->pause_dtg.u      - jog_delta.u;
+	    emcmotStatus->dtg.v      = emcmotStatus->pause_dtg.v      - jog_delta.v;
+	    emcmotStatus->dtg.w      = emcmotStatus->pause_dtg.w      - jog_delta.w;
+	    double _dx = emcmotStatus->dtg.tran.x;
+	    double _dy = emcmotStatus->dtg.tran.y;
+	    double _dz = emcmotStatus->dtg.tran.z;
+	    emcmotStatus->distance_to_go = sqrt(_dx*_dx + _dy*_dy + _dz*_dz);
+	}
         /* end of FREE mode */
 	break;
 
