@@ -864,8 +864,13 @@ static void flush_segments(void) {
     double x = pos.x, y = pos.y, z = pos.z;
     double a = pos.a, b = pos.b, c = pos.c;
     double u = pos.u, v = pos.v, w = pos.w;
-    
+
     int line_no = pos.line_no;
+
+    // shortest-path adjustment for rotary axes
+    if (canon.shortest_rotary[0]) a = shortest_rotary_target(a, canon.endPoint.a);
+    if (canon.shortest_rotary[1]) b = shortest_rotary_target(b, canon.endPoint.b);
+    if (canon.shortest_rotary[2]) c = shortest_rotary_target(c, canon.endPoint.c);
 
 #ifdef SHOW_JOINED_SEGMENTS
     for(unsigned int i=0; i != chained_points.size(); i++) { printf("."); }
@@ -1024,6 +1029,11 @@ void STRAIGHT_TRAVERSE(int line_number,
 
     from_prog(x,y,z,a,b,c,u,v,w);
     rotate_and_offset_pos(x,y,z,a,b,c,u,v,w);
+
+    // shortest-path adjustment for rotary axes
+    if (canon.shortest_rotary[0]) a = shortest_rotary_target(a, canon.endPoint.a);
+    if (canon.shortest_rotary[1]) b = shortest_rotary_target(b, canon.endPoint.b);
+    if (canon.shortest_rotary[2]) c = shortest_rotary_target(c, canon.endPoint.c);
 
     VelData veldata = getStraightVelocity(x, y, z, a, b, c, u, v, w);
     AccelData accdata = getStraightAcceleration(x, y, z, a, b, c, u, v, w);
@@ -2437,6 +2447,36 @@ bool GET_OPTIONAL_PROGRAM_STOP()
     return canon.optional_program_stop; //state == ON, means we stop
 }
 
+// Persistent store for INI-configured shortest-rotary flags.
+// Lives outside CanonConfig_t so INIT_CANON() resets don't lose the INI values.
+static bool ini_shortest_rotary[3] = {false, false, false};
+
+void SET_ROTARY_SHORTEST_PATH(int axis, bool enable)
+{
+    if (axis >= 3 && axis <= 5) {
+        ini_shortest_rotary[axis - 3] = enable;  // survive INIT_CANON()
+        canon.shortest_rotary[axis - 3] = enable;
+    }
+}
+
+bool GET_ROTARY_SHORTEST_PATH(int axis)
+{
+    if (axis >= 3 && axis <= 5)
+        return canon.shortest_rotary[axis - 3];
+    return false;
+}
+
+/* Adjust target angle to take the shortest arc from current.
+   Returns a new target equivalent to the original mod 360 but
+   within ±180 degrees of current. */
+static double shortest_rotary_target(double target, double current)
+{
+    double diff = target - current;
+    while (diff >  180.0) diff -= 360.0;
+    while (diff < -180.0) diff += 360.0;
+    return current + diff;
+}
+
 void OPTIONAL_PROGRAM_STOP()
 {
     EMC_TASK_PLAN_OPTIONAL_STOP stopMsg;
@@ -2546,6 +2586,9 @@ void INIT_CANON()
     canon.angular_move = 0;
     canon.linearFeedRate = 0.0;
     canon.angularFeedRate = 0.0;
+    canon.shortest_rotary[0] = ini_shortest_rotary[0]; // A
+    canon.shortest_rotary[1] = ini_shortest_rotary[1]; // B
+    canon.shortest_rotary[2] = ini_shortest_rotary[2]; // C
     ZERO_EMC_POSE(canon.toolOffset);
 
     /* 

@@ -29,6 +29,7 @@
 #include "emccfg.h"		// default values for globals
 
 #include "inihal.hh"
+#include "canon.hh"
 
 extern value_inihal_data old_inihal_data;
 double ext_offset_a_or_v_ratio[EMCMOT_MAX_AXIS]; // all zero
@@ -148,6 +149,13 @@ static int loadAxis(int axis, EmcIniFile *axisIniFile)
                 rcs_print_error("bad return from emcAxisSetLockingJoint\n");
             }
             return -1;
+        }
+
+        // SHORTEST_ROTARY: when 1, moves always take the shorter arc (<=180 deg)
+        if (axis >= 3 && axis <= 5) {
+            int shortest = 0;
+            axisIniFile->Find(&shortest, "SHORTEST_ROTARY", axisString);
+            SET_ROTARY_SHORTEST_PATH(axis, shortest != 0);
         }
     }
 

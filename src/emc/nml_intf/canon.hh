@@ -191,6 +191,11 @@ typedef struct CanonConfig_t {
    //         angular means axes ABC move
     int cartesian_move;
     int angular_move;
+/* Shortest-path mode for rotary axes A, B, C.
+   When enabled for an axis, the commanded angle is adjusted so the
+   move always takes the shorter arc (<=180 deg) rather than the longer
+   one.  Index: 0=A, 1=B, 2=C. */
+    bool shortest_rotary[3];
 } CanonConfig_t;
 
 /* Initialization */
@@ -679,6 +684,11 @@ extern void NURB_FEED(double sStart, double sEnd);
 
 /* Block delete */
 extern void SET_BLOCK_DELETE(bool enabled);
+
+/* Shortest-path rotary mode.
+   axis: 3=A, 4=B, 5=C.  enable=true means use shortest arc. */
+extern void SET_ROTARY_SHORTEST_PATH(int axis, bool enable);
+extern bool GET_ROTARY_SHORTEST_PATH(int axis);
 /* Command to set the internal reference of block delete.
 The ON value for enabled will cause the interpreter to discard lines
 that start with the "/" character. */
