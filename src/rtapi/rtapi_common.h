@@ -75,9 +75,9 @@
 #include <rtapi_mutex.h>
 
 /* maximum number of various resources */
-#define RTAPI_MAX_MODULES 64
-#define RTAPI_MAX_TASKS   64
-#define RTAPI_MAX_SHMEMS  32
+#define RTAPI_MAX_MODULES 128
+#define RTAPI_MAX_TASKS   128
+#define RTAPI_MAX_SHMEMS  64
 #define RTAPI_MAX_SEMS    64
 #define RTAPI_MAX_FIFOS   32
 #define RTAPI_MAX_IRQS    16
